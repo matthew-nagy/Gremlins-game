@@ -1,7 +1,7 @@
 import pygame as py
 from pygame.locals import *
 py.init()
-import ServerClient as server
+import ServerClient as net
 import level as l
 import sprite as s
 
