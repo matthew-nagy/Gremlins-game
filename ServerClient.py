@@ -42,7 +42,7 @@ def get_connections():
 
         #If their response is the finisher, 
         if reply.decode('utf-8') != finish_message:
-            print(reply.decode(), "has joined the lobby")
+            print(reply.decode(), "has joined the lobby from",addr,"!")
             connections.append(connection)
             names.append(reply.decode())
             message = "You have connected to host as player " + str(len(connections))
