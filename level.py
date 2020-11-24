@@ -34,10 +34,15 @@ class Level:
                 elif self.isColor(pixel, 0, 255, 0):
                     self.drawRect(window, self.GreenCol, x, y)
     
-    def isCollision(self, x, y):
+    def is_collision(self, x, y):
+        #Set the position in the right place first
+        x -= self.startPoint[0]
+        y -= self.startPoint[1]
         return self.isColor(self.image.getpixel((x / self.blockSize, y / self.blockSize)), 0, 0, 0)
     
-    def isGoal(self, x, y):
+    def is_goal(self, x, y):
+        x -= self.startPoint[0]
+        y -= self.startPoint[1]
         return self.isColor(self.image.getpixel((x / self.blockSize, y / self.blockSize)), 0, 255, 0)
 
   #  def towerSpawnPositions(self):
