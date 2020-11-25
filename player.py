@@ -63,7 +63,7 @@ class Positional_Data:
             return False
         return True
 
-    def applyMovement(self, input, level):
+    def apply_movement(self, input, level):
         x_movement = 0
         y_movement = 0
         if input.up:
@@ -103,20 +103,70 @@ class Base_Player:
         self.sprite = sprite.Sprite((x,y), sprite.drawCircle, (window, 3), colour)
     
     #sends by UDP because we don't want the entire system to freeze up
-    def sendPositionData(self, connection):
-        connection.sendto(bytes(self.current_position))
+    def send_position_data(self, connection):
+        connection.sendto(bytes(self.current_input))
 
+    def respond_to_server_ping(self, truePosition, level):
+        if truePosition.frameOn >= self.current_position.frameOn:
+            self.adjust_to_future_data(truePosition)
+        else:
+            self.adjust_to_past_data(truePosition, level)
+
+    #This one is real easy, just TP the player there
+    def adjust_to_future_data(self, truePosition):
+        self.previous_positions = []
+        self.previous_inputs = []
+        self.current_position = truePosition
+
+    #This one. This is hard. You need to teleport the player back and then
+    #play through their inputs since the past event
+    def adjust_to_past_data(self, truePosition, level):
+        for i in range(len(self.previous_positions)):
+            if self.previous_positions[i].frameOn == truePosition.frameOn:
+                #found what the server thinks, so lets update off of that
+                #As input and position are found at the same time lets assume this is
+                #what true input relates to as well
+                if not self.previous_positions[i].equals(truePosition):
+                     
+                    framesOff = self.current_position.frameOn 
+                    self.current_position = copy.copy(truePosition)
+
+                    #Don't think about these variable names too hard
+                    future_past_positions = []
+                    future_past_inputs = []
+                    for j in range(i + 1, len(self.previous_positions)):
+                        future_past_positions.append(self.previous_positions[j])
+                        future_past_inputs.append(self.previous_inputs[j])
+
+                    for j in range(framesOff):
+                        self.apply_movement(self.previous_inputs[i + j], level)
+                    
+                    #Up to date with where you were with the server, so you good for now
+                    #Don't need to remember what you did before then, you know you are correct
+                    #We only care about the ones that happened after the frame you just confirmed
+                    #PLEASE don't think about this too hard, it works I swear, the human mind wasn't
+                    #built to deal with compeating parallel lines of events. This is some Homestuck
+                    #level shinnanigans
+                    self.previous_inputs = future_past_inputs
+                    self.previous_positions = future_past_positions
+
+                    return
+
+    
     def draw(self):
         self.sprite.setPosition(self.current_position.x, self.current_position.y)
         self.sprite.draw()
     
     #If they didn't 
-    def getLastInput(self):
+    def get_last_input(self):
         return self.current_input
     
-    def applyMovement(self, input, level):
+    def apply_movement(self, input, level):
         self.previous_positions.append(copy.copy(self.current_position))
         self.previous_inputs.append(copy.copy(self.current_input))
 
+        self.apply_movement_no_save(input, level)
+
+    def apply_movement_no_save(self, input, level):
         self.current_input = input
-        self.current_position.applyMovement(input, level)
+        self.current_position.apply_movement(input, level)
