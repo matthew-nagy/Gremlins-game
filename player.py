@@ -55,7 +55,7 @@ class Positional_Data:
         self.frameOn = int(0)
 
     def __bytes__(self):
-        return bytes(self.x, self.y, self.rotation, self.state, self.frameOn)
+        return bytes([self.x, self.y, self.rotation, self.state, self.frameOn])
 
     def equals(self, otherData):
         if not self.x == otherData.x:

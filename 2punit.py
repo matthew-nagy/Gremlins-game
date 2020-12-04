@@ -87,7 +87,7 @@ def runGameClient():
         clientPlayer.apply_movement(player_input, lvl)
         clientPlayer.send_input_to_host(host)
 
-        data, addr = host.socket.recvfrom(1024)
+        data, addr = host.socket.recvfrom(64)
         [x, y, r, state, f, x2, y2, r2, state2, f2] = struct.unpack('ffdddffddd', data)
         
         p = player.Positional_Data(x, y, r, state)
