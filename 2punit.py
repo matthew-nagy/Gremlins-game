@@ -5,6 +5,7 @@ import ServerClient as net
 import level as l
 import sprite as s
 import player
+import struct
 
 
 
@@ -44,6 +45,9 @@ def runGameHost():
         
         clientMovement = player.Player_Input(data[0], data[1], data[2], data[3], data[4], data[5], data[6])
         clientPlayer.apply_movement(clientMovement, lvl)
+
+        toSend = bytes(hostPlayer.current_position) + bytes(clientPlayer.current_position)
+        connections[0].socket.sendto(toSend, connections[0].IP, connections[0].port)
         
         fps_controller.tick(30)
 
@@ -82,6 +86,17 @@ def runGameClient():
 
         clientPlayer.apply_movement(player_input, lvl)
         clientPlayer.send_input_to_host(host)
+
+        data, addr = host.socket.recvfrom(1024)
+        [x, y, r, state, f, x2, y2, r2, state2, f2] = struct.unpack('ffdddffddd', data)
+        
+        p = player.Positional_Data(x, y, r, state)
+        p.frameOn = f
+        hostPlayer.respond_to_server_ping(p, lvl)
+
+        p = player.Positional_Data(x2, y2, r2, state2)
+        p.frameOn = f2
+        clientPlayer.respond_to_server_ping(p, lvl)
         
         fps_controller.tick(30)
 

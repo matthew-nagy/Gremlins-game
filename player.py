@@ -52,7 +52,7 @@ class Positional_Data:
         self.y = float(y)
         self.rotation = int(rotation)
         self.state = int(state)
-        self.frameOn = 0
+        self.frameOn = int(0)
 
     def __bytes__(self):
         return bytes(self.x, self.y, self.rotation, self.state, self.frameOn)
