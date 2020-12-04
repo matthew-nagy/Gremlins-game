@@ -19,10 +19,17 @@ class Player_Input:
         self.rotate_anticlockwise = rotate_anticlockwise
         self.trigger = trigger
 
+    def __bytes__(self):
+        return bytes([self.up, self.down, self.left, self.right, self.rotate_clockwise, self.rotate_anticlockwise, self.trigger])
+
     @staticmethod
-    def generate():
+    def generate(mapUse = 0):
         inputs = [False, False, False, False, False, False, False] 
-        key_maps = [py.K_w, py.K_s, py.K_a, py.K_d, py.K_l, py.K_k, py.K_RETURN]
+        key_maps = []
+        if mapUse == 0:
+            key_maps = [py.K_w, py.K_s, py.K_a, py.K_d, py.K_l, py.K_k, py.K_RETURN]
+        else:
+            key_maps = py.K_UP, py.K_DOWN, py.K_LEFT, py.K_RIGHT, py.K_e, py.K_q, py.K_SPACE
         all_key_pressed_info = py.key.get_pressed()
 
         count = 0
@@ -102,9 +109,9 @@ class Base_Player:
         self.current_position = Positional_Data(x, y, 0, state.alive)    #Current position
         self.sprite = sprite.Sprite((x,y), sprite.drawCircle, (window, 3), colour)
     
-    #sends by UDP because we don't want the entire system to freeze up
-    def send_position_data(self, connection):
-        connection.sendto(bytes(self.current_input))
+    #sends by TCP because UDP dont work yet
+    def send_input_to_host(self, connection):
+        connection.socket.sendto(bytes(self.current_input), (connection.IP, connection.port))
 
     def respond_to_server_ping(self, truePosition, level):
         if truePosition.frameOn >= self.current_position.frameOn:
