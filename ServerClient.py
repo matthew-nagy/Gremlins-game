@@ -13,8 +13,19 @@ def handle_full_players(finisher, port):
     r.connect((s.gethostname(), port))
     r.send(bytes(finisher, 'utf-8'))
 
+class Net_Connection:
+    def __init__(self, socket, IP, port):
+        self.socket = socket
+        self.IP = IP
+        self.port = port
+    
+    def send(self, bytesToSend):
+        self.socket.send(bytesToSend)
+    
+    def recv(self, bufferSize):
+        return self.socket.recv(bufferSize)
 
-#Returns list of connections and list of names of the connections
+#Returns list of Net_Connections and list of names of the connections
 def get_connections():
     listener = s.socket()
     host_IP = s.gethostname()
@@ -42,8 +53,8 @@ def get_connections():
 
         #If their response is the finisher, 
         if reply.decode('utf-8') != finish_message:
-            print(reply.decode(), "has joined the lobby from",addr,"!")
-            connections.append(connection)
+            print(reply.decode(), "has joined the lobby from",address,"!")
+            connections.append(Net_Connection(connection, address[0], address[1]))
             names.append(reply.decode())
             message = "You have connected to host as player " + str(len(connections))
             connection.send(bytes(message, 'utf-8'))
@@ -56,11 +67,13 @@ def get_connections():
 #Returns a connection to the server
 def get_host():
     connection = s.socket()
-    connection.connect((input("Please enter the target address\n\t"), int(input("Please enter the port\n\t"))))
+    address = input("Please enter the target address\n\t")
+    port = int(input("Please enter the port\n\t"))
+    connection.connect((address, port))
     name = input("\n\nWhat is your name?\n\t")
 
     connection.send(bytes(name,'utf-8'))
     print()
     print(connection.recv(1024).decode())
     
-    return connection
+    return Net_Connection(connection, address, port)
