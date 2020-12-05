@@ -3,6 +3,8 @@ import pygame as py
 import level as l
 import copy
 import sprite
+import pickle
+import sys
 
 class state:
     dead = 0
@@ -21,6 +23,17 @@ class Player_Input:
 
     def __bytes__(self):
         return bytes([self.up, self.down, self.left, self.right, self.rotate_clockwise, self.rotate_anticlockwise, self.trigger])
+
+    def getAsBytes(self):
+        msg = pickle.dumps(self)
+        return msg
+    
+    @staticmethod
+    def loadFromBytes(msg, currentPoint):
+        toReturn = Player_Input(False, False, False, False, False, False, False)
+        nextPoint = currentPoint + sys.getsizeof(Player_Input)
+        toReturn = pickle.loads(msg[currentPoint : nextPoint])
+        return toReturn, nextPoint
 
     @staticmethod
     def generate(mapUse = 0):
@@ -50,12 +63,11 @@ class Positional_Data:
     def __init__(self, x, y, rotation, state):
         self.x = float(x)
         self.y = float(y)
+        self.packX = int(x)
+        self.packY = int(y)
         self.rotation = int(rotation)
         self.state = int(state)
         self.frameOn = int(0)
-
-    def __bytes__(self):
-        return bytes([self.x, self.y, self.rotation, self.state, self.frameOn])
 
     def equals(self, otherData):
         if not self.x == otherData.x:
@@ -88,7 +100,7 @@ class Positional_Data:
         if not level.is_collision(self.x, self.y + y_movement):
             self.y += y_movement
         rotation_speed = 2
-        if input.rotate_clockwise:
+        if input.rotate_clockwise: 
             self.rotation += rotation_speed
             if self.rotation > 360:
                 self.rotation -= 360
@@ -97,6 +109,8 @@ class Positional_Data:
             if self.rotation < 0:
                 self.rotation += 360
         
+        self.packX = int(self.x)
+        self.packY = int(self.y)
         #Finally incriment what frame this is
         self.frameOn += 1
 
@@ -127,6 +141,7 @@ class Base_Player:
 
     #This one. This is hard. You need to teleport the player back and then
     #play through their inputs since the past event
+    #Don't let them be more than 10 frames ahead
     def adjust_to_past_data(self, truePosition, level):
         for i in range(len(self.previous_positions)):
             if self.previous_positions[i].frameOn == truePosition.frameOn:
@@ -135,12 +150,17 @@ class Base_Player:
                 #what true input relates to as well
                 if not self.previous_positions[i].equals(truePosition):
                      
-                    framesOff = self.current_position.frameOn 
+                    framesOff = self.current_position.frameOn
+                    if framesOff > 10:
+                        framesOff = 10
                     self.current_position = copy.copy(truePosition)
 
                     #Don't think about these variable names too hard
                     future_past_positions = []
                     future_past_inputs = []
+                    end = len(self.previous_positions)
+                    if end + i + 1 > 10:
+                        end = i + 1 + 10
                     for j in range(i + 1, len(self.previous_positions)):
                         future_past_positions.append(self.previous_positions[j])
                         future_past_inputs.append(self.previous_inputs[j])
