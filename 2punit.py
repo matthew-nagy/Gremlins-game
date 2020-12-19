@@ -16,9 +16,9 @@ def runGameHost():
 
     lvl = l.Level('map1.png', 20, (50, 50))
 
-    clientPlayer = player.Base_Player(300, 300, py.Color(255, 0, 150), window)
+    clientPlayer = player.Base_Player(300, 300, py.Color(255, 0, 150), window, 0)
     
-    hostPlayer = player.Base_Player(350,350, py.Color(0, 255, 0), window)
+    hostPlayer = player.Base_Player(350,350, py.Color(0, 255, 0), window, 1)
 
     connections, names = net.get_connections()
     for i in connections:
@@ -42,13 +42,23 @@ def runGameHost():
                 return
         
         player_input = player.Player_Input.generate(1)
-
         hostPlayer.apply_movement(player_input, lvl)
+
         data, addr = connections[0].socket.recvfrom(1024) # buffer size is 1024 bytes
         
-        clientMovement = player.Player_Input(data[0], data[1], data[2], data[3], data[4], data[5], data[6])
-        clientPlayer.apply_movement(clientMovement, lvl)
+        try:
+            clientMovement = pickle.loads(data)
+            clientPlayer.apply_movement(clientMovement, lvl)
+        except:
+            print("Nothing works")
         
+        toSend = []
+        toSend.append(player.copy.copy(hostPlayer.current_position))
+        toSend.append(player.copy.copy(clientPlayer.current_position))
+        toSendData = player.pickle.dumps(toSend)
+        connections[0].socket.sendto(toSendData, (connections[0].IP, connections[0].port))
+
+
         frame += 1
         if frame % 30 == 0:
             print(frame)
@@ -64,8 +74,8 @@ def runGameClient():
 
     lvl = l.Level('map1.png', 20, (50, 50))
 
-    clientPlayer = player.Base_Player(300, 300, py.Color(255, 0, 150), window)
-    hostPlayer = player.Base_Player(350,350, py.Color(0, 255, 0), window)
+    clientPlayer = player.Base_Player(300, 300, py.Color(255, 0, 150), window, 0)
+    hostPlayer = player.Base_Player(350,350, py.Color(0, 255, 0), window, 1)
 
     host = net.get_host()
     print("Waiting for the host to start the game")
@@ -91,11 +101,21 @@ def runGameClient():
         player_input = player.Player_Input.generate()
 
         clientPlayer.apply_movement(player_input, lvl)
-        clientPlayer.send_input_to_host(host)
+        clientPlayer.send_to_host(host)
+
+
+        data, addr = host.socket.recvfrom(1024) # buffer size is 1024 bytes
+        try:
+            positions = pickle.loads(data)
+            hostPlayer.respond_to_server_ping(positions[0], lvl)
+            clientPlayer.respond_to_server_ping(positions[1], lvl)
+        except:
+            print("Nothing works")
+
         
         frame += 1
-        if frame % 30 == 0:
-            print(frame)
+        #if frame % 30 == 0:
+        #    print(frame)
 
         fps_controller.tick(30)
 

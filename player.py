@@ -4,7 +4,8 @@ import level as l
 import copy
 import sprite
 import pickle
-import sys
+import datetime
+import datetime
 
 class state:
     dead = 0
@@ -27,13 +28,6 @@ class Player_Input:
     def getAsBytes(self):
         msg = pickle.dumps(self)
         return msg
-    
-    @staticmethod
-    def loadFromBytes(msg, currentPoint):
-        toReturn = Player_Input(False, False, False, False, False, False, False)
-        nextPoint = currentPoint + sys.getsizeof(Player_Input)
-        toReturn = pickle.loads(msg[currentPoint : nextPoint])
-        return toReturn, nextPoint
 
     @staticmethod
     def generate(mapUse = 0):
@@ -60,6 +54,14 @@ recieves positional datum from the server, it can see if its own state matches i
 a UPD package was lost somewhere, and the client corrects itself to match the server, propagating the change up
 '''
 class Positional_Data:
+    x = 0.0
+    y = 0.0
+    packX = 0
+    packY = 0
+    rotation = 0
+    state = 0
+    timestamp = datetime.datetime.now()
+
     def __init__(self, x, y, rotation, state):
         self.x = float(x)
         self.y = float(y)
@@ -67,7 +69,7 @@ class Positional_Data:
         self.packY = int(y)
         self.rotation = int(rotation)
         self.state = int(state)
-        self.frameOn = int(0)
+        self.timestamp =  datetime.datetime.now()
 
     def equals(self, otherData):
         if not self.x == otherData.x:
@@ -78,7 +80,7 @@ class Positional_Data:
             return False
         elif not self.state == otherData.state:
             return False
-        elif not self.frameOn == otherData.frameOn:
+        elif not self.timestamp == otherData.timestamp:
             return False
         return True
 
@@ -111,24 +113,38 @@ class Positional_Data:
         
         self.packX = int(self.x)
         self.packY = int(self.y)
-        #Finally incriment what frame this is
-        self.frameOn += 1
+        #Finally reregister when this happened
+        self.timestamp = datetime.datetime.now()
+
+class Player_Network_Information:
+    def __init__(self, player_input, player_number):
+        self.input = player_input
+        self.player_number = player_number
+    
+    def get_as_pickle_obj(self):
+        return pickle.dumps(self)
 
 class Base_Player:
-    def __init__(self, x, y, colour, window):
+    def __init__(self, x, y, colour, window, player_number):
         self.previous_positions = []#The last few positions it has been in
         self.previous_inputs = []#The last few inputs the player recieved
 
         self.current_input = Player_Input(0,0,0,0,0,0,0) #The current Input it thinks it has
         self.current_position = Positional_Data(x, y, 0, state.alive)    #Current position
         self.sprite = sprite.Sprite((x,y), sprite.drawCircle, (window, 3), colour)
+
+        self.player_number = player_number
     
-    #sends by TCP because UDP dont work yet
-    def send_input_to_host(self, connection):
-        connection.socket.sendto(bytes(self.current_input), (connection.IP, connection.port))
+    
+    def send_to_host(self, connection):
+        data = self.get_as_data()
+        connection.socket.sendto(data, (connection.IP, connection.port))
+
+    def get_as_data(self):
+        return pickle.dumps(self.current_input)#Player_Network_Information(self.current_input, self.player_number).get_as_pickle_obj()
 
     def respond_to_server_ping(self, truePosition, level):
-        if truePosition.frameOn >= self.current_position.frameOn:
+        if max(truePosition.timestamp, self.current_position.timestamp) == truePosition.timestamp:
             self.adjust_to_future_data(truePosition)
         else:
             self.adjust_to_past_data(truePosition, level)
@@ -143,41 +159,27 @@ class Base_Player:
     #play through their inputs since the past event
     #Don't let them be more than 10 frames ahead
     def adjust_to_past_data(self, truePosition, level):
-        for i in range(len(self.previous_positions)):
-            if self.previous_positions[i].frameOn == truePosition.frameOn:
+        trueTime = truePosition.timestamp
+        for pos_index in range(len(self.previous_positions)):
+            myTime = self.previous_positions[pos_index].timestamp
+            #If this timestamp is ahead of the true order of events
+            if max(myTime, trueTime) == myTime:
                 #found what the server thinks, so lets update off of that
-                #As input and position are found at the same time lets assume this is
-                #what true input relates to as well
-                if not self.previous_positions[i].equals(truePosition):
-                     
-                    framesOff = self.current_position.frameOn
-                    if framesOff > 10:
-                        framesOff = 10
-                    self.current_position = copy.copy(truePosition)
 
-                    #Don't think about these variable names too hard
-                    future_past_positions = []
-                    future_past_inputs = []
-                    end = len(self.previous_positions)
-                    if end + i + 1 > 10:
-                        end = i + 1 + 10
-                    for j in range(i + 1, len(self.previous_positions)):
-                        future_past_positions.append(self.previous_positions[j])
-                        future_past_inputs.append(self.previous_inputs[j])
+                self.current_position = copy.copy(truePosition)
+                #Store old thoughts about positions and inputs
+                stored_timestamps = self.previous_positions
+                past_past_inputs = self.previous_inputs
+                #Now set the actual past to 0, and get ready to rebuild it
+                self.previous_positions = []
+                self.previous_inputs = []
 
-                    for j in range(framesOff):
-                        self.apply_movement(self.previous_inputs[i + j], level)
-                    
-                    #Up to date with where you were with the server, so you good for now
-                    #Don't need to remember what you did before then, you know you are correct
-                    #We only care about the ones that happened after the frame you just confirmed
-                    #PLEASE don't think about this too hard, it works I swear, the human mind wasn't
-                    #built to deal with compeating parallel lines of events. This is some Homestuck
-                    #level shinnanigans
-                    self.previous_inputs = future_past_inputs
-                    self.previous_positions = future_past_positions
+                for i in range(pos_index + 1, len(stored_timestamps)):
+                    self.apply_movement(past_past_inputs[i], level)
+                    # Re:Timestamp. Building up a list of timestamps from zero
+                    self.current_position.timestamp = stored_timestamps[i].timestamp
 
-                    return
+                return
 
     
     def draw(self):
